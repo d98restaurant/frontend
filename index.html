@@ -1,0 +1,94 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Simple POS - D98</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0}
+    .app{display:flex;height:100vh}
+    .menu{width:55%;padding:10px;border-right:1px solid #ddd;overflow:auto}
+    .cart{width:45%;padding:10px}
+    .item{padding:8px;border:1px solid #eee;margin:6px;cursor:pointer}
+    .cart-item{display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #ddd}
+    button{padding:8px 12px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <h2 style="margin:0">D98 Restaurant — POS</h2>
+    <div style="font-size:14px;color:#555">Currency: INR ₹</div>
+  </div>
+  <hr/>
+<div class="menu">
+      <h3>Menu</h3>
+      <div id="menu-list"></div>
+    </div>
+    <div class="cart">
+      <h3>Cart</h3>
+      <div id="cart-list"></div>
+      <div style="margin-top:10px">
+        <button id="place-order">Place Order</button>
+      </div>
+      <div id="message" style="margin-top:12px;color:green"></div>
+    </div>
+  </div>
+  <script>
+    const API = 'http://localhost:4000/api';
+    let menu = [];
+    let cart = [];
+    async function loadMenu(){
+      // fallback sample
+      try{
+        const res = await fetch(API+'/menu_items');
+        if(res.ok){ menu = await res.json(); renderMenu(); return; }
+      }catch(e){}
+      menu = [
+        {id:1,name:'Paneer Masala',price:160},
+        {id:2,name:'Mushroom Masala',price:160},
+        {id:3,name:'Chicken Masala',price:190},
+        {id:4,name:'Chicken Fried Rice',price:170}
+      ];
+      renderMenu();
+    }
+    function renderMenu(){
+      const ml = document.getElementById('menu-list'); ml.innerHTML='';
+      menu.forEach(it=>{
+        const d = document.createElement('div'); d.className='item';
+        d.innerHTML=`<b>${it.name}</b><div>₹ ${it.price}</div>`;
+        d.onclick = ()=> { addToCart(it); };
+        ml.appendChild(d);
+      });
+    }
+    function addToCart(it){
+      const existing = cart.find(c=>c.menu_item_id===it.id);
+      if(existing) existing.qty++;
+      else cart.push({menu_item_id:it.id, name:it.name, price:it.price, qty:1});
+      renderCart();
+    }
+    function renderCart(){
+      const cl = document.getElementById('cart-list'); cl.innerHTML='';
+      cart.forEach(ci=>{
+        const div = document.createElement('div'); div.className='cart-item';
+        div.innerHTML = `<div>${ci.name} x ${ci.qty}</div><div>₹ ${ci.price*ci.qty}</div>`;
+        cl.appendChild(div);
+      });
+    }
+    document.getElementById('place-order').onclick = async ()=>{
+      if(cart.length===0) return alert('Cart empty');
+      const payload = { order_type:'takeaway', table_no:null, customer_name:'pos-customer', items: cart.map(c=>({menu_item_id:c.menu_item_id, qty:c.qty})), created_by:1};
+      document.getElementById('message').textContent = 'Placing order...';
+      try{
+        const res = await fetch(API+'/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const data = await res.json();
+        if(res.ok){ document.getElementById('message').textContent = 'Order placed. ID: '+data.order_id; cart=[]; renderCart(); }
+        else document.getElementById('message').textContent = 'Error: '+(data.error||JSON.stringify(data));
+      }catch(e){ document.getElementById('message').textContent = 'Network error'; }
+    };
+    loadMenu();
+  </script>
+</body>
+</html>
